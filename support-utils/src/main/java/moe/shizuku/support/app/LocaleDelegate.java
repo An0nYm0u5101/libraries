@@ -3,31 +3,36 @@ package moe.shizuku.support.app;
 import android.app.Activity;
 import android.content.Context;
 import android.content.res.Configuration;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.LocaleList;
+import android.support.v4.os.LocaleListCompat;
 import android.text.TextUtils;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
 
 public class LocaleDelegate {
 
-    /** current locale **/
-    private static Locale sDefaultLocale = Locale.getDefault();
+    /** current locales **/
+    private static LocaleListCompat sDefaultLocales = LocaleListCompat.getDefault();
 
-    /** system locale **/
-    private static Locale sSystemLocale = Locale.getDefault();
+    /** system locales **/
+    private static LocaleListCompat sSystemLocales = LocaleListCompat.getDefault();
 
     /** locale of this instance **/
-    private Locale mLocale = Locale.getDefault();
+    private LocaleListCompat mLocales = LocaleListCompat.getDefault();
 
     /**
-     * Get default locale stored in this class.
+     * Get default locale list stored in this class.
      *
-     * @return default locale
+     * @return default locale list
      */
-    public static Locale getDefaultLocale() {
-        return sDefaultLocale;
+    public static LocaleListCompat getDefaultLocale() {
+        return sDefaultLocales;
     }
 
     /**
@@ -36,7 +41,15 @@ public class LocaleDelegate {
      * @param newLocale new locale
      */
     public static void setDefaultLocale(Locale newLocale) {
-        sDefaultLocale = newLocale;
+        final List<Locale> locales = new ArrayList<>();
+        locales.add(newLocale);
+        for (int index = 0; index < sSystemLocales.size(); index++) {
+            final Locale item = sSystemLocales.get(index);
+            if (!Objects.equals(newLocale, item)) {
+                locales.add(item);
+            }
+        }
+        sDefaultLocales = LocaleListCompat.create(locales.toArray(new Locale[0]));
     }
 
     /**
@@ -44,8 +57,8 @@ public class LocaleDelegate {
      *
      * @return system locale
      */
-    public static Locale getSystemLocale() {
-        return sSystemLocale;
+    public static LocaleListCompat getSystemLocale() {
+        return sSystemLocales;
     }
 
     /**
@@ -53,8 +66,8 @@ public class LocaleDelegate {
      *
      * @param systemLocale new locale
      */
-    public static void setSystemLocale(Locale systemLocale) {
-        sSystemLocale = systemLocale;
+    public static void setSystemLocales(LocaleListCompat systemLocale) {
+        sSystemLocales = systemLocale;
     }
 
     /**
@@ -64,7 +77,7 @@ public class LocaleDelegate {
      * @return locale changed
      */
     public boolean isLocaleChanged() {
-        return !Objects.equals(sDefaultLocale, mLocale);
+        return !Objects.equals(sDefaultLocales, mLocales);
     }
 
     /**
@@ -73,9 +86,13 @@ public class LocaleDelegate {
      * @param configuration Configuration
      */
     public void updateConfiguration(Configuration configuration) {
-        mLocale = sDefaultLocale;
+        mLocales = sDefaultLocales;
 
-        configuration.setLocale(mLocale);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            configuration.setLocales((LocaleList) mLocales.unwrap());
+        } else {
+            configuration.setLocale(mLocales.get(0));
+        }
     }
 
     /**
@@ -85,6 +102,10 @@ public class LocaleDelegate {
      * @param activity Activity
      */
     public void onCreate(Activity activity) {
-        activity.getWindow().getDecorView().setLayoutDirection(TextUtils.getLayoutDirectionFromLocale(mLocale));
+        Locale firstMatched = mLocales.getFirstMatch(activity.getAssets().getLocales());
+        if (firstMatched == null) {
+            firstMatched = mLocales.get(0);
+        }
+        activity.getWindow().getDecorView().setLayoutDirection(TextUtils.getLayoutDirectionFromLocale(firstMatched));
     }
 }
